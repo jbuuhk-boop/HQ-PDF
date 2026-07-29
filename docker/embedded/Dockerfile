@@ -8,6 +8,7 @@ ARG BASE_IMAGE=stirlingtools/stirling-pdf-base:${BASE_VERSION}
 FROM gradle:9.6.1-jdk25@sha256:d25357611c559203299f3c6673101154156bdd28985858ff6f465fc69bd27ca4 AS app-build
 
 ARG TASK_VERSION=3.49.1
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && update-ca-certificates \
@@ -29,10 +30,10 @@ ENV JDK_JAVA_OPTIONS="--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNN
 WORKDIR /app
 
 COPY build.gradle settings.gradle gradlew ./
-COPY gradle/                               gradle/
-COPY app/core/build.gradle                  app/core/
-COPY app/common/build.gradle                app/common/
-COPY app/proprietary/build.gradle           app/proprietary/
+COPY gradle/ gradle/
+COPY app/core/build.gradle app/core/
+COPY app/common/build.gradle app/common/
+COPY app/proprietary/build.gradle app/proprietary/
 
 # Use system gradle instead of gradlew to avoid SSL issues downloading gradle distribution on emulated arm64
 RUN gradle dependencies --no-daemon || true
@@ -42,12 +43,17 @@ COPY . .
 ARG PROTOTYPES_BUILD=false
 ARG STIRLING_FLAVOR=proprietary
 ENV STIRLING_FLAVOR=${STIRLING_FLAVOR}
+
+# Increase Node.js heap memory for frontend build
+ENV NODE_OPTIONS=--max-old-space-size=1536
+
 # Embed the admin portal app at /portal. Set true by the deploy workflow when the
 # portal or AI layers change; defaults false so normal builds skip the extra app.
 ARG BUILD_PORTAL=false
 
 # Bundle only the JPDFium native for this image's target arch.
 ARG TARGETARCH
+
 RUN JPDFIUM_PLATFORM="$([ "$TARGETARCH" = arm64 ] && echo linux-arm64 || echo linux-x64)" && \
     STIRLING_FLAVOR=${STIRLING_FLAVOR} \
     gradle clean build \
@@ -60,10 +66,12 @@ RUN JPDFIUM_PLATFORM="$([ "$TARGETARCH" = arm64 ] && echo linux-arm64 || echo li
 
 # Stage 2: Extract Spring Boot Layers
 FROM eclipse-temurin:25-jre-noble@sha256:b27ca47660a8fa837e47a8533b9b1a3a430295cf29ca28d91af4fd121572dc29 AS jar-extract
-WORKDIR /tmp
-COPY --from=app-build /app/app/core/build/libs/*.jar app.jar
-RUN java -Djarmode=tools -jar app.jar extract --layers --destination /layers
 
+WORKDIR /tmp
+
+COPY --from=app-build /app/app/core/build/libs/*.jar app.jar
+
+RUN java -Djarmode=tools -jar app.jar extract --layers --destination /layers
 
 # Stage 3: Final runtime image on top of pre-built base
 FROM ${BASE_IMAGE}
@@ -73,13 +81,14 @@ ARG VERSION_TAG
 WORKDIR /app
 
 # Application layers
-COPY --link --from=jar-extract --chown=1000:1000 /layers/dependencies/           /app/
-COPY --link --from=jar-extract --chown=1000:1000 /layers/spring-boot-loader/     /app/
-COPY --link --from=jar-extract --chown=1000:1000 /layers/snapshot-dependencies/  /app/
-COPY --link --from=jar-extract --chown=1000:1000 /layers/application/            /app/
+COPY --link --from=jar-extract --chown=1000:1000 /layers/dependencies/ /app/
+COPY --link --from=jar-extract --chown=1000:1000 /layers/spring-boot-loader/ /app/
+COPY --link --from=jar-extract --chown=1000:1000 /layers/snapshot-dependencies/ /app/
+COPY --link --from=jar-extract --chown=1000:1000 /layers/application/ /app/
 
 COPY --link --from=app-build --chown=1000:1000 \
      /app/build/libs/restart-helper.jar /restart-helper.jar
+
 COPY --link --chown=1000:1000 scripts/ /scripts/
 
 # Fonts go to system dir, root ownership is correct (world-readable)
@@ -135,10 +144,14 @@ LABEL org.opencontainers.image.title="Stirling-PDF" \
       org.opencontainers.image.keywords="PDF, manipulation, API, Spring Boot, React"
 
 EXPOSE 8080/tcp
+
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
   CMD curl -fs --max-time 10 http://localhost:8080${SYSTEM_ROOTURIPATH:-''}/api/v1/info/status || exit 1
 
 ENTRYPOINT ["tini", "--", "/scripts/init.sh"]
+
 CMD []
+```
+
