@@ -13,11 +13,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Install Pandoc and wkhtmltopdf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc wkhtmltopdf
+
       - name: Convert Markdown to PDF
-        uses: baileyour/markdown-to-pdf-action@v1.0.1
-        with:
-          input_file: document.md
-          output_file: document.pdf
+        run: |
+          pandoc document.md -o document.pdf --pdf-engine=wkhtmltopdf
 
       - name: Upload PDF Artifact
         uses: actions/upload-artifact@v4
