@@ -1,16 +1,26 @@
-name: Test GitHub Runner
+name: Generate PDF Document
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  test:
+  build-pdf:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Test runner
-        run: |
-          echo "GitHub Runner is working!"
-          uname -a
-          docker --version
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Convert Markdown to PDF
+        uses: baileyour/markdown-to-pdf-action@v1.0.1
+        with:
+          input_file: document.md
+          output_file: document.pdf
+
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Generated-PDF-File
+          path: document.pdf
