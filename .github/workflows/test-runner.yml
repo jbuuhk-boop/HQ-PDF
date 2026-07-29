@@ -1,0 +1,16 @@
+name: Test GitHub Runner
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test runner
+        run: |
+          echo "GitHub Runner is working!"
+          uname -a
+          docker --version
