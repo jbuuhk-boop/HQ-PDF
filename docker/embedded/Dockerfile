@@ -153,5 +153,3 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
 ENTRYPOINT ["tini", "--", "/scripts/init.sh"]
 
 CMD []
-```
-
