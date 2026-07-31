@@ -510,7 +510,7 @@ noPreview = "Select a PDF to preview"
 red = "Red"
 saturation = "Saturation:"
 tags = "contrast,brightness,saturation,adjust colors,color correction,enhance,lighten,darken,improve quality,color balance,hue,vibrance"
-title = "Adjust Colors/Contrast"
+title = "Adjust Colors"
 
 [adjustContrast.error]
 failed = "Failed to adjust colors/contrast"
